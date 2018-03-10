@@ -10,7 +10,7 @@ import UIKit
 
 class TodoListViewController: UITableViewController {
 
-    let itemArray = ["Find Mike", "Buy Eggos", "Destroy Demogorgon"]
+    var itemArray = ["Find Mike", "Buy Eggos", "Destroy Demogorgon"]
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -41,7 +41,6 @@ class TodoListViewController: UITableViewController {
     //MARK: - Table view delegate
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        //print(itemArray[indexPath.row])
         
         if let selectedCell = tableView.cellForRow(at: indexPath) {
             if selectedCell.accessoryType == .checkmark {
@@ -52,6 +51,48 @@ class TodoListViewController: UITableViewController {
             }
         }
         tableView.deselectRow(at: indexPath, animated: true)
+    }
+    
+    @IBAction func addButtonTapped(_ sender: UIBarButtonItem) {
+        
+        class AddAction: UIAlertAction, UITextFieldDelegate {
+            override init() {
+                super.init()
+                NotificationCenter.default.addObserver(self, selector: #selector(textFieldTextChanged(notification:)), name: .UITextFieldTextDidChange, object: nil)
+            }
+            @objc func textFieldTextChanged(notification: NSNotification) {
+                if let textField = notification.object as? UITextField {
+                    if textField.text! == "" {
+                        isEnabled = false
+                    }
+                    else {
+                        isEnabled = true
+                    }
+                }
+            }
+        }
+        
+        let alert = UIAlertController(title: "New Todo", message: nil, preferredStyle: .alert)
+        let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
+        let addAction = AddAction(title: "Add todo", style: .default) { (action) in
+            let enteredText = alert.textFields!.first!.text!
+            self.itemArray += [enteredText]
+            let indexPathToInsert = IndexPath(row: self.itemArray.count-1, section: 0)
+            self.tableView.insertRows(at: [indexPathToInsert], with: .automatic)
+        }
+        addAction.isEnabled = false
+        
+        alert.addAction(cancelAction)
+        alert.addAction(addAction)
+        alert.addTextField { (textField) in
+            textField.placeholder = "Enter Todo"
+            textField.autocapitalizationType = .sentences
+            textField.returnKeyType = .done
+            textField.delegate = addAction
+        }
+        
+        present(alert, animated: true, completion: nil)
+        
     }
     
 
