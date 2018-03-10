@@ -10,11 +10,14 @@ import UIKit
 
 class TodoListViewController: UITableViewController {
 
-    var itemArray = ["Find Mike", "Buy Eggos", "Destroy Demogorgon"]
+    var itemArray = [String]()
+    
+    let defaults = UserDefaults.standard
     
     override func viewDidLoad() {
         super.viewDidLoad()
-
+        itemArray = defaults.array(forKey: "TodoListArray") as? [String] ?? []
+        
         // Uncomment the following line to preserve selection between presentations
         // self.clearsSelectionOnViewWillAppear = false
 
@@ -79,6 +82,7 @@ class TodoListViewController: UITableViewController {
             self.itemArray += [enteredText]
             let indexPathToInsert = IndexPath(row: self.itemArray.count-1, section: 0)
             self.tableView.insertRows(at: [indexPathToInsert], with: .automatic)
+            self.defaults.set(self.itemArray, forKey: "TodoListArray")
         }
         addAction.isEnabled = false
         
