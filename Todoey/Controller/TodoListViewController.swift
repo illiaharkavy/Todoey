@@ -10,19 +10,32 @@ import UIKit
 
 class TodoListViewController: UITableViewController {
 
-    var todosArray = [Todo]()
+    var todosArray = [Todo]() {
+        didSet {
+            saveTodos()
+        }
+    }
     
     let defaults = UserDefaults.standard
     
+    var url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("todos")
+    
     override func viewDidLoad() {
         super.viewDidLoad()
-        //itemArray = defaults.array(forKey: "TodoListArray") as? [String] ?? []
+        
+        do {
+            let data = try Data(contentsOf: url)
+            todosArray = try JSONDecoder().decode([Todo].self, from: data)
+        } catch {
+            print("Unable to load todos. Error: \(error)")
+        }
         
         // Uncomment the following line to preserve selection between presentations
         // self.clearsSelectionOnViewWillAppear = false
 
         // Uncomment the following line to display an Edit button in the navigation bar for this view controller.
-        // self.navigationItem.rightBarButtonItem = self.editButtonItem
+        self.navigationItem.leftBarButtonItem = self.editButtonItem
+        self.navigationItem.leftBarButtonItem?.tintColor
     }
 
     // MARK: - Table view data source
@@ -79,7 +92,7 @@ class TodoListViewController: UITableViewController {
             self.todosArray += [Todo(title: enteredText, done: false)]
             let indexPathToInsert = IndexPath(row: self.todosArray.count-1, section: 0)
             self.tableView.insertRows(at: [indexPathToInsert], with: .automatic)
-            //self.defaults.set(self.itemArray, forKey: "TodoListArray")
+            
         }
         addAction.isEnabled = false
         
@@ -96,41 +109,48 @@ class TodoListViewController: UITableViewController {
         
     }
     
+    func saveTodos() {
+        do {
+            let jsonData = try JSONEncoder().encode(todosArray)
+            try jsonData.write(to: url)
+        } catch {
+            print("Unable to save todos. Error: \(error)")
+        }
+    }
+    
 
-    /*
+    
     // Override to support conditional editing of the table view.
     override func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
-        // Return false if you do not want the specified item to be editable.
         return true
     }
-    */
+    
 
-    /*
+    
     // Override to support editing the table view.
     override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCellEditingStyle, forRowAt indexPath: IndexPath) {
         if editingStyle == .delete {
-            // Delete the row from the data source
+            todosArray.remove(at: indexPath.row)
             tableView.deleteRows(at: [indexPath], with: .fade)
-        } else if editingStyle == .insert {
-            // Create a new instance of the appropriate class, insert it into the array, and add a new row to the table view
-        }    
+        }
     }
-    */
+    
 
-    /*
+    
     // Override to support rearranging the table view.
     override func tableView(_ tableView: UITableView, moveRowAt fromIndexPath: IndexPath, to: IndexPath) {
-
+        let movedTodo = todosArray[fromIndexPath.row]
+        todosArray.remove(at: fromIndexPath.row)
+        todosArray.insert(movedTodo, at: to.row)
     }
-    */
+    
 
-    /*
+    
     // Override to support conditional rearranging of the table view.
     override func tableView(_ tableView: UITableView, canMoveRowAt indexPath: IndexPath) -> Bool {
-        // Return false if you do not want the item to be re-orderable.
         return true
     }
-    */
+    
 
     /*
     // MARK: - Navigation
