@@ -126,6 +126,7 @@ class TodoListViewController: UITableViewController {
             textField.autocapitalizationType = .sentences
             textField.returnKeyType = .done
             textField.delegate = addAction
+            textField.enablesReturnKeyAutomatically = true
         }
         
         present(alert, animated: true, completion: nil)
