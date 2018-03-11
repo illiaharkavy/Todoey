@@ -11,20 +11,21 @@ import CoreData
 
 class TodoListViewController: UITableViewController {
 
+    var todos = [Todo]()
+    var filteredTodos = [Todo]()
     
-    var todosArray = [Todo]() {
-        didSet {
-            //saveTodos()
-        }
-    }
-    
-    
-    
-    let defaults = UserDefaults.standard
     let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    let searchController = UISearchController(searchResultsController: nil)
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        searchController.searchResultsUpdater = self
+        searchController.obscuresBackgroundDuringPresentation = false
+        searchController.searchBar.placeholder = "Search Candies"
+        navigationItem.searchController = searchController
+        definesPresentationContext = true
+        
         loadTodos()
         
         //self.navigationItem.leftBarButtonItem = self.editButtonItem
@@ -35,14 +36,27 @@ class TodoListViewController: UITableViewController {
     // MARK: - Table view data source
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return todosArray.count
+        if isFiltering() {
+            return filteredTodos.count
+        }
+        else {
+            return todos.count
+        }
     }
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "TodoItemCell", for: indexPath)
 
-        cell.textLabel?.text = todosArray[indexPath.row].title
-        cell.accessoryType = todosArray[indexPath.row].done ? .checkmark : .none
+        let todo: Todo
+        if isFiltering() {
+            todo = filteredTodos[indexPath.row]
+        }
+        else {
+            todo = todos[indexPath.row]
+        }
+        
+        cell.textLabel?.text = todo.title
+        cell.accessoryType = todo.done ? .checkmark : .none
 
         return cell
     }
@@ -54,8 +68,15 @@ class TodoListViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         
         if let selectedCell = tableView.cellForRow(at: indexPath) {
-            todosArray[indexPath.row].done = !todosArray[indexPath.row].done
-            selectedCell.accessoryType = todosArray[indexPath.row].done ? .checkmark : .none
+            let todo: Todo
+            if isFiltering() {
+                todo = filteredTodos[indexPath.row]
+            }
+            else {
+                todo = todos[indexPath.row]
+            }
+            todo.done = !todo.done
+            selectedCell.accessoryType = todo.done ? .checkmark : .none
         }
         tableView.deselectRow(at: indexPath, animated: true)
         
@@ -91,8 +112,8 @@ class TodoListViewController: UITableViewController {
             let todo = Todo(context: self.context)
             todo.done = false
             todo.title = enteredText
-            self.todosArray += [todo]
-            let indexPathToInsert = IndexPath(row: self.todosArray.count-1, section: 0)
+            self.todos += [todo]
+            let indexPathToInsert = IndexPath(row: self.todos.count-1, section: 0)
             self.tableView.insertRows(at: [indexPathToInsert], with: .automatic)
             self.saveTodos()
         }
@@ -124,7 +145,7 @@ class TodoListViewController: UITableViewController {
     
     func loadTodos(with request: NSFetchRequest<Todo> = Todo.fetchRequest()) {
         do {
-            todosArray = try context.fetch(request)
+            todos = try context.fetch(request)
         } catch {
             print("Error fetcing data from context \(error)")
         }
@@ -142,60 +163,41 @@ class TodoListViewController: UITableViewController {
     // Override to support editing the table view.
     override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCellEditingStyle, forRowAt indexPath: IndexPath) {
         if editingStyle == .delete {
-            context.delete(todosArray[indexPath.row])
-            todosArray.remove(at: indexPath.row)
+            context.delete(todos[indexPath.row])
+            todos.remove(at: indexPath.row)
             tableView.deleteRows(at: [indexPath], with: .fade)
             saveTodos()
         }
     }
     
-    /*
-    // Override to support rearranging the table view.
-    override func tableView(_ tableView: UITableView, moveRowAt fromIndexPath: IndexPath, to: IndexPath) {
-        let movedTodo = todosArray[fromIndexPath.row]
-        context.delete(todosArray[fromIndexPath.row])
-        todosArray.remove(at: fromIndexPath.row)
-        todosArray.insert(movedTodo, at: to.row)
+    func filterContentForSearchText(_ searchText: String) {
+        let request: NSFetchRequest<Todo> = Todo.fetchRequest()
+        request.predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchText)
+        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        do {
+            filteredTodos = try context.fetch(request)
+        } catch {
+            print("Error fetcing data from context \(error)")
+        }
         
+        tableView.reloadData()
     }
     
-    
-    // Override to support conditional rearranging of the table view.
-    override func tableView(_ tableView: UITableView, canMoveRowAt indexPath: IndexPath) -> Bool {
-        return true
+    func searchBarIsEmpty() -> Bool {
+        // Returns true if the text is empty or nil
+        return searchController.searchBar.text?.isEmpty ?? true
     }
-*/
+    
+    func isFiltering() -> Bool {
+        return searchController.isActive && !searchBarIsEmpty()
+    }
+    
 }
 
-
-//MARK: - Search bar methods
-
-extension TodoListViewController: UISearchBarDelegate {
-    
-    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-        searchBar.resignFirstResponder()
+extension TodoListViewController: UISearchResultsUpdating {
+    func updateSearchResults(for searchController: UISearchController) {
+        filterContentForSearchText(searchController.searchBar.text!)
     }
     
-    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-        let request: NSFetchRequest<Todo> = Todo.fetchRequest()
-        request.predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
-        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
-        loadTodos(with: request)
-    }
-    
-    
-    func searchBarTextDidBeginEditing(_ searchBar: UISearchBar) {
-        searchBar.showsCancelButton = true
-    }
-    
-    func searchBarTextDidEndEditing(_ searchBar: UISearchBar) {
-        searchBar.showsCancelButton = false
-    }
-    
-    func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
-        loadTodos()
-        searchBar.text = ""
-        searchBar.resignFirstResponder()
-    }
     
 }
