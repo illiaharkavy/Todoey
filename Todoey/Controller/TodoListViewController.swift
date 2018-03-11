@@ -7,45 +7,37 @@
 //
 
 import UIKit
+import CoreData
 
 class TodoListViewController: UITableViewController {
 
+    
     var todosArray = [Todo]() {
         didSet {
-            saveTodos()
+            //saveTodos()
         }
     }
     
-    let defaults = UserDefaults.standard
     
-    var url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("todos")
+    
+    let defaults = UserDefaults.standard
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        loadTodos()
         
-        do {
-            let data = try Data(contentsOf: url)
-            todosArray = try JSONDecoder().decode([Todo].self, from: data)
-        } catch {
-            print("Unable to load todos. Error: \(error)")
-        }
-        
-        // Uncomment the following line to preserve selection between presentations
-        // self.clearsSelectionOnViewWillAppear = false
-
-        // Uncomment the following line to display an Edit button in the navigation bar for this view controller.
-        self.navigationItem.leftBarButtonItem = self.editButtonItem
-        self.navigationItem.leftBarButtonItem?.tintColor
+        //self.navigationItem.leftBarButtonItem = self.editButtonItem
     }
+    
+    
 
     // MARK: - Table view data source
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        // #warning Incomplete implementation, return the number of rows
         return todosArray.count
     }
 
-    
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "TodoItemCell", for: indexPath)
 
@@ -54,6 +46,8 @@ class TodoListViewController: UITableViewController {
 
         return cell
     }
+    
+    
     
     //MARK: - Table view delegate
     
@@ -64,7 +58,12 @@ class TodoListViewController: UITableViewController {
             selectedCell.accessoryType = todosArray[indexPath.row].done ? .checkmark : .none
         }
         tableView.deselectRow(at: indexPath, animated: true)
+        
+        saveTodos()
+        
     }
+    
+    
     
     @IBAction func addButtonTapped(_ sender: UIBarButtonItem) {
         
@@ -89,10 +88,13 @@ class TodoListViewController: UITableViewController {
         let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
         let addAction = AddAction(title: "Add todo", style: .default) { (action) in
             let enteredText = alert.textFields!.first!.text!
-            self.todosArray += [Todo(title: enteredText, done: false)]
+            let todo = Todo(context: self.context)
+            todo.done = false
+            todo.title = enteredText
+            self.todosArray += [todo]
             let indexPathToInsert = IndexPath(row: self.todosArray.count-1, section: 0)
             self.tableView.insertRows(at: [indexPathToInsert], with: .automatic)
-            
+            self.saveTodos()
         }
         addAction.isEnabled = false
         
@@ -109,57 +111,91 @@ class TodoListViewController: UITableViewController {
         
     }
     
+    
+    
     func saveTodos() {
         do {
-            let jsonData = try JSONEncoder().encode(todosArray)
-            try jsonData.write(to: url)
+            try context.save()
         } catch {
             print("Unable to save todos. Error: \(error)")
         }
+        print("Saved")
     }
     
-
+    func loadTodos(with request: NSFetchRequest<Todo> = Todo.fetchRequest()) {
+        do {
+            todosArray = try context.fetch(request)
+        } catch {
+            print("Error fetcing data from context \(error)")
+        }
+        tableView.reloadData()
+    }
+    
+    
     
     // Override to support conditional editing of the table view.
     override func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
         return true
     }
     
-
     
     // Override to support editing the table view.
     override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCellEditingStyle, forRowAt indexPath: IndexPath) {
         if editingStyle == .delete {
+            context.delete(todosArray[indexPath.row])
             todosArray.remove(at: indexPath.row)
             tableView.deleteRows(at: [indexPath], with: .fade)
+            saveTodos()
         }
     }
     
-
-    
+    /*
     // Override to support rearranging the table view.
     override func tableView(_ tableView: UITableView, moveRowAt fromIndexPath: IndexPath, to: IndexPath) {
         let movedTodo = todosArray[fromIndexPath.row]
+        context.delete(todosArray[fromIndexPath.row])
         todosArray.remove(at: fromIndexPath.row)
         todosArray.insert(movedTodo, at: to.row)
+        
     }
     
-
     
     // Override to support conditional rearranging of the table view.
     override func tableView(_ tableView: UITableView, canMoveRowAt indexPath: IndexPath) -> Bool {
         return true
     }
+*/
+}
+
+
+//MARK: - Search bar methods
+
+extension TodoListViewController: UISearchBarDelegate {
     
-
-    /*
-    // MARK: - Navigation
-
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        // Get the new view controller using segue.destinationViewController.
-        // Pass the selected object to the new view controller.
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        searchBar.resignFirstResponder()
     }
-    */
-
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        let request: NSFetchRequest<Todo> = Todo.fetchRequest()
+        request.predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
+        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        loadTodos(with: request)
+    }
+    
+    
+    func searchBarTextDidBeginEditing(_ searchBar: UISearchBar) {
+        searchBar.showsCancelButton = true
+    }
+    
+    func searchBarTextDidEndEditing(_ searchBar: UISearchBar) {
+        searchBar.showsCancelButton = false
+    }
+    
+    func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
+        loadTodos()
+        searchBar.text = ""
+        searchBar.resignFirstResponder()
+    }
+    
 }
